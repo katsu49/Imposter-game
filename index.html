@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Word Imposter</title>
+    <style>
+        /* Global Native App Overrides */
+        * {
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            -ms-user-select: none; 
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: #12131a; 
+            color: #ffffff; 
+            padding: 0; 
+            margin: 0; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+        }
+
+        /* Fixed Window Container Bounds */
+        .app-window {
+            width: 100%;
+            max-width: 440px;
+            height: 100vh;
+            max-height: 850px;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            position: relative;
+            overflow: hidden; /* Prevents any children from breaking the outer bounding frame */
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: 26px;
+            font-weight: 800;
+            margin: 0 0 4px 0;
+            background: linear-gradient(135deg, #00f0ff, #0072ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: #6c7293;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0;
+        }
+
+        .screen {
+            background: #1c1e29;
+            border-radius: 24px;
+            padding: 28px 24px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            opacity: 1;
+            transform: scale(1);
+            position: relative;
+            overflow: hidden; /* Hard caps screens internally */
+        }
+
+        .hidden { 
+            display: none !important; 
+            opacity: 0; 
+            transform: scale(0.96); 
+        }
+        
+        .lang-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 15px; }
+        .lang-start-btn { 
+            background: #252836; 
+            border: none;
+            color: #ffffff; 
+            padding: 16px; 
+            border-radius: 16px; 
+            cursor: pointer; 
+            font-size: 15px; 
+            font-weight: 600; 
+            font-family: inherit;
+            transition: background 0.15s, transform 0.1s; 
+        }
+        .lang-start-btn:active { 
+            background: #2f3345;
+            transform: scale(0.97);
+        }
+
+        button.main-btn { 
+            background: linear-gradient(135deg, #00bcd4, #0097a7);
+            border: none; 
+            padding: 16px 24px; 
+            color: white; 
+            font-size: 16px; 
+            border-radius: 16px; 
+            cursor: pointer; 
+            width: 100%; 
+            font-weight: 700; 
+            font-family: inherit;
+            box-shadow: 0 8px 20px rgba(0, 188, 212, 0.25);
+            transition: transform 0.1s, filter 0.15s;
+            outline: none;
+            margin-top: auto;
+            flex-shrink: 0; /* Ensures buttons never squish down when layout fills up */
+        }
+        button.main-btn:active { 
+            transform: scale(0.97);
+            filter: brightness(0.9);
+        }
+
+        button.reveal-all-btn { 
+            background: linear-gradient(135deg, #e91e63, #c2185b); 
+            box-shadow: 0 8px 20px rgba(233, 30, 99, 0.25);
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+        
+        button.secondary-btn { 
+            background: #2a2d3d; 
+            color: #a0aec0; 
+            box-shadow: none; 
+        }
+        button.secondary-btn:active { background: #33374a; }
+        
+        .btn-group { 
+            display: flex; 
+            gap: 14px; 
+            width: 47%; 
+            margin-top: auto; 
+            flex-shrink: 0;
+        }
+        .btn-group button.main-btn {
+            margin-top: 0;
+        }
+
+        .secret-box {
+            background: #12131a;
+            border: 2px dashed #ffeb3b;
+            padding: 24px;
+            border-radius: 16px;
+            margin: 25px 0;
+        }
+        .secret-text { 
+            font-size: 30px; 
+            font-weight: 800; 
+            color: #ffeb3b; 
+            letter-spacing: 0.5px;
+        }
+
+        .imposter-warn { 
+            color: #ff334b; 
+            font-weight: 800; 
+            font-size: 20px; 
+            margin-bottom: 8px; 
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .switch-input, .vote-check-input { display: none; }
+        .switch-label {
+            width: 46px;
+            height: 26px;
+            background: #4a4f66;
+            display: inline-block;
+            border-radius: 100px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .switch-label::after {
+            content: '';
+            position: absolute;
+            top: 3px; left: 3px; width: 20px; height: 20px;
+            background: white;
+            border-radius: 90px;
+            transition: transform 0.2s;
+        }
+        .switch-input:checked + .switch-label { background: #00bcd4; }
+        .switch-input:checked + .switch-label::after { transform: translateX(20px); }
+
+        .vote-label {
+            width: 32px;
+            height: 32px;
+            background: #252836;
+            display: inline-block;
+            border-radius: 8px;
+            position: relative;
+            cursor: pointer;
+            border: 2px solid #4a4f66;
+            transition: all 0.2s;
+        }
+        .vote-label::after {
+            content: '✓';
+            position: absolute;
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 900;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            transition: transform 0.15s;
+        }
+        .vote-check-input:checked + .vote-label {
+            background: #e91e63;
+            border-color: #e91e63;
+            box-shadow: 0 0 10px rgba(233, 30, 99, 0.4);
+        }
+        .vote-check-input:checked + .vote-label::after {
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        .vote-check-input:disabled + .vote-label {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-color: #33374a;
+        }
+
+        .result-banner {
+            padding: 16px;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .result-banner.win { background: rgba(76, 175, 80, 0.15); border: 1px solid #4caf50; color: #4caf50; }
+        .result-banner.lose { background: rgba(255, 51, 75, 0.15); border: 1px solid #ff334b; color: #ff334b; }
+
+        .custom-select-trigger {
+            background: #252836;
+            color: #00bcd4;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 210px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: background 0.15s;
+        }
+        .custom-select-trigger:active {
+            background: #2f3345;
+        }
+
+        /* Fixed Overlay Structure Configuration */
+        .full-area-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1c1e29;
+            border-radius: 24px;
+            padding: 28px 24px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            overflow: hidden; /* Keeps overlay bounds crisp inside screen shape */
+        }
+        
+        .overlay-title {
+            font-size: 22px;
+            font-weight: 800;
+            margin: 0 0 16px 0;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        /* Custom Appealing Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3a3f54;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00bcd4;
+        }
+
+        .theme-options-scroll {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 6px;
+            margin-bottom: 8px;
+        }
+
+        .theme-option-btn {
+            background: #252836;
+            border: 1px solid rgba(255,255,255,0.02);
+            color: #ffffff;
+            padding: 18px 24px;
+            font-size: 20px; 
+            font-weight: 700;
+            border-radius: 16px;
+            cursor: pointer;
+            text-align: center;
+            font-family: inherit;
+            transition: background 0.15s, border-color 0.15s;
+            flex-shrink: 0; /* Prevents button list from collapsing into lines */
+        }
+        .theme-option-btn:active {
+            background: #2f3345;
+        }
+        .theme-option-btn.selected {
+            background: rgba(0, 188, 212, 0.1);
+            border-color: #00bcd4;
+            color: #00bcd4;
+        }
+
+        .theme-option-btn.random-spec {
+            background: linear-gradient(135deg, #252836, #1d202d);
+            border: 1px dashed rgba(0, 188, 212, 0.4);
+        }
+
+        input[type="text"] { 
+            background: #252836;
+            color: #ffffff;
+            padding: 12px; 
+            font-size: 16px; 
+            border-radius: 12px; 
+            border: none; 
+            text-align: left; 
+            font-family: inherit;
+            font-weight: 600;
+            outline: none;
+            width: 100%;
+            margin-bottom: 8px;
+            padding-left: 16px;
+            -webkit-appearance: none;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        .nickname-list { 
+            margin: 15px 0; 
+            overflow-y: auto; 
+            padding-right: 6px; 
+            flex-grow: 1; 
+        }
+        .setup-fields-container { margin-top: 16px; display: flex; flex-direction: column; }
+
+        .setup-row { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin: 14px 0; 
+            font-size: 15px; 
+            font-weight: 600; 
+            color: #b4b9d1; 
+        }
+        
+        /* Fixed: Dynamic voting grid summary list container flex parameters */
+        .summary-list { 
+            text-align: left; 
+            background: #12131a; 
+            padding: 12px; 
+            border-radius: 16px; 
+            margin: 15px 0; 
+            overflow-y: auto; 
+            flex-grow: 1; 
+            padding-right: 6px;
+        }
+        .summary-item { padding: 14px 8px; border-bottom: 1px solid #1c1e29; display: flex; justify-content: space-between; font-size: 15px; align-items: center; }
+        .summary-item:last-child { border-bottom: none; }
+        
+        .role-badge { font-weight: 700; padding: 4px 10px; border-radius: 8px; background: #252836; font-size: 12px; text-transform: uppercase; }
+        .role-badge.imposter-role { color: #ff334b; background: rgba(255, 51, 75, 0.1); }
+        .role-badge.normal-role { color: #4caf50; background: rgba(76, 175, 80, 0.1); }
+        
+        .starter-highlight-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 40px 0;
+        }
+
+        .starter-prefix {
+            font-size: 24px;
+            font-weight: 500;
+            color: #9da3be;
+            margin-bottom: 8px;
+        }
+
+        .starter-name-banner {
+            font-size: 38px;
+            font-weight: 900;
+            color: #00bcd4;
+            letter-spacing: 0.5px;
+            text-shadow: 0 0 15px rgba(0, 188, 212, 0.2);
+            text-transform: uppercase;
+        }
+
+        h2 { font-size: 24px; font-weight: 800; margin: 0 0 8px 0; flex-shrink: 0; }
+        p { color: #9da3be; font-size: 14px; margin: 0 0 20px 0; flex-shrink: 0; }
+    </style>
+</head>
+<body>
+
+    <div class="app-window">
+        <header>
+            <h1 id="ui-title">Word Imposter</h1>
+            <p class="subtitle" id="ui-subtitle-lbl">Local Party Game</p>
+        </header>
+
+        <div id="lang-screen" class="screen">
+            <h2 style="text-align: center; margin-bottom: 16px; font-size: 18px;">Select Language</h2>
+            <div class="lang-grid">
+                <button class="lang-start-btn" onclick="selectLanguage('en')">English</button>
+                <button class="lang-start-btn" onclick="selectLanguage('uk')">Українська</button>
+                <button class="lang-start-btn" onclick="selectLanguage('pl')">Polski</button>
+                <button class="lang-start-btn" onclick="selectLanguage('de')">Deutsch</button>
+                <button class="lang-start-btn" onclick="selectLanguage('es')">Español</button>
+                <button class="lang-start-btn" onclick="selectLanguage('fr')">Français</button>
+                <button class="lang-start-btn" onclick="selectLanguage('it')">Italiano</button>
+            </div>
+        </div>
+
+        <div id="setup-screen" class="screen hidden">
+            <h2 id="ui-setup-title">Game Setup</h2>
+            <div class="setup-fields-container">
+                <div class="setup-row">
+                    <span id="ui-total-players">Total Players:</span> 
+                    <div id="players-selector-trigger" class="custom-select-trigger" onclick="openPlayersOverlay()">4</div>
+                </div>
+                <div class="setup-row">
+                    <span id="ui-total-imposters">Imposters:</span> 
+                    <div id="imposters-selector-trigger" class="custom-select-trigger" onclick="openImpostersOverlay()">1</div>
+                </div>
+                <div class="setup-row">
+                    <span id="ui-theme-label">Theme:</span>
+                    <div id="theme-selector-trigger" class="custom-select-trigger" onclick="openThemeOverlay()">---</div>
+                </div>
+                <div class="setup-row">
+                    <span id="ui-hints-label">Give Imposters Hints:</span>
+                    <div>
+                        <input type="checkbox" id="hints-enabled" class="switch-input" checked>
+                        <label for="hints-enabled" class="switch-label"></label>
+                    </div>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="main-btn secondary-btn" id="ui-back-btn" onclick="backToLang()">Back</button>
+                <button class="main-btn" id="ui-next-btn" onclick="showNicknamesScreen()">Next</button>
+            </div>
+            <div id="theme-overlay" class="full-area-overlay hidden">
+                <div id="ui-overlay-title" class="overlay-title">Choose Topic</div>
+                <div id="theme-options-container" class="theme-options-scroll"></div>
+            </div>
+
+            <div id="players-overlay" class="full-area-overlay hidden">
+                <div class="overlay-title" id="ui-overlay-players-title">Total Players</div>
+                <div id="players-options-container" class="theme-options-scroll"></div>
+            </div>
+
+            <div id="imposters-overlay" class="full-area-overlay hidden">
+                <div class="overlay-title" id="ui-overlay-imposters-title">Imposters</div>
+                <div id="imposters-options-container" class="theme-options-scroll"></div>
+            </div>
+        </div>
+
+        <div id="nicknames-screen" class="screen hidden">
+            <h2 id="ui-nick-screen-title">Players</h2>
+            <p id="ui-enter-nicks">Enter player names:</p>
+            <div id="nickname-inputs-container" class="nickname-list"></div>
+            <div class="btn-group">
+                <button class="main-btn secondary-btn" id="ui-back-btn" onclick="backToSetup()">Back</button>
+                <button class="main-btn" id="ui-start-btn" onclick="startGame()">Start Game</button>
+            </div>
+        </div>
+
+        <div id="game-screen" class="screen hidden">
+            <h2 id="player-turn">Player's Turn</h2>
+            <p id="ui-pass-msg">Pass the phone to this player, then tap below to see your secret.</p>
+            
+            <button class="main-btn" id="ui-reveal-btn" onclick="revealWord()">Reveal Word</button>
+            
+            <div id="secret-area" class="hidden" style="text-align: center; width: 100%;">
+                <p id="ui-imposter-alert" class="imposter-warn hidden"></p>
+                <p id="ui-secret-lead" style="font-size: 13px; color: #6c7293; margin-bottom: 0; text-transform: uppercase;">Your secret word:</p>
+                <div class="secret-box">
+                    <div id="secret-word" class="secret-text">XXXX</div>
+                </div>
+                <button class="main-btn" id="ui-hide-btn" onclick="nextPlayer()">Got it, Hide Word</button>
+            </div>
+        </div>
+
+        <div id="discussion-screen" class="screen hidden">
+            <h2 id="ui-disc-title">Discussion Starter</h2>
+            <p id="ui-disc-desc">All secrets have been read. Time to discuss!</p>
+            <div class="starter-highlight-container">
+                <div id="ui-starter-prefix" class="starter-prefix">You start</div>
+                <div id="discussion-starter-name" class="starter-name-banner">NAME</div>
+            </div>
+            <button class="main-btn" id="ui-to-vote-btn" onclick="loadVotingMenu()">Proceed to Voting Menu</button>
+        </div>
+
+        <div id="end-screen" class="screen hidden">
+            <h2 id="ui-end-title">Time to Vote!</h2>
+            <p id="ui-end-msg">Select who you think the Imposter is, then check results.</p>
+            
+            <div id="game-result-banner" class="result-banner hidden"></div>
+            <div id="game-summary" class="summary-list"></div>
+            
+            <button class="main-btn reveal-all-btn" id="ui-reveal-all-btn" onclick="evaluateVotesAndReveal()">Confirm Votes</button>
+            <div class="btn-group">
+                <button class="main-btn secondary-btn" id="ui-quit-btn" onclick="quitToMainMenu()">Menu</button>
+                <button class="main-btn" id="ui-again-btn" onclick="playAgainSameSettings()">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const translations = {
+            en: { title: "Word Imposter", subtitleLbl: "Local Party Game", setupTitle: "Game Setup", themeLabel: "Theme", totalPlayers: "Total Players", totalImposters: "Imposters", enterNicks: "Enter player names:", defaultNick: "Player", startBtn: "Start Game", turn: "{name}'s Turn", passMsg: "Pass the phone to this player, then tap below to reveal your secret word.", revealBtn: "Reveal Word", secretLead: "Your secret word:", imposterAlert: "⚠️ You are the Imposter!", hideBtn: "Got it, Hide Word", endTitle: "Time to Vote!", endMsg: "Who is the Imposter? Check the suspect rows below to run evaluation.", againBtn: "Play Again", revealAllBtn: "Confirm Votes", hiddenRole: "???", imposterBadge: "Imposter", normalBadge: "Civilian", nextBtn: "Next", backBtn: "Back", quitBtn: "Main Menu", nickScreenTitle: "Players", hintsLabel: "Imposter Hints", winMsg: "🏆 Civilians Won // Imposter Caught", loseMsg: "💥 Imposter Won // Infiltration Successful", discTitle: "Discussion Round", discDesc: "All secrets have been read. Time to discuss out loud!", toVoteBtn: "Open Voting Panel", starterPrefix: "You start", overlayTitle: "Choose Topic", randomTheme: "🎲 Random Topic" },
+            uk: { title: "Самозванець", subtitleLbl: "Локальна гра для вечірок", setupTitle: "Налаштування гри", themeLabel: "Тема", totalPlayers: "Всього гравців", totalImposters: "Самозванці", enterNicks: "Введіть імена гравців:", defaultNick: "Гравець", startBtn: "Почати гру", turn: "Черга: {name}", passMsg: "Передайте телефон цьому гравцеві, а потім натисніть нижче, щоб побачити слово.", revealBtn: "Показати слово", secretLead: "Ваше таємне слово:", imposterAlert: "⚠️ Ви Самозванець!", hideBtn: "Зрозуміло, сховати", endTitle: "Час голосувати!", endMsg: "Хто Самозванець? Позначте підозрюваних нижче, щоб перевірити результат.", againBtn: "Грати знову", revealAllBtn: "Підтвердити вибір", hiddenRole: "???", imposterBadge: "Шпигун", normalBadge: "Мирний", nextBtn: "Далі", backBtn: "Назад", quitBtn: "Головне меню", nickScreenTitle: "Гравці", hintsLabel: "Підказки Шпигуну", winMsg: "🏆 Мирні виграли // Шпигуна спіймано", loseMsg: "💥 Шпигун виграв // Інфільтрація успішна", discTitle: "Раунд Обговорення", discDesc: "Всі слова прочитано. Час почати дискусію!", toVoteBtn: "Перейти до голосування", starterPrefix: "Починає", overlayTitle: "Оберіть тему", randomTheme: "🎲 Випадкова тема" },
+            pl: { title: "Impostor", subtitleLbl: "Lokalna gierka imprezowa", setupTitle: "Ustawienia gry", themeLabel: "Temat", totalPlayers: "Liczba graczy", totalImposters: "Impostorzy", enterNicks: "Wpisz imiona graczy:", defaultNick: "Gracz", startBtn: "Uruchom grę", turn: "Kolej gracza: {name}", passMsg: "Podaj telefon temu graczowi, a następnie dotknij poniżej, aby zobaczyć słowo.", revealBtn: "Pokaż słowo", secretLead: "Twoje sekretne słowo:", imposterAlert: "⚠️ Jesteś Impostorem!", hideBtn: "Rozumiem, ukryj", endTitle: "Czas na głosowanie!", endMsg: "Kto jest Impostorem? Zaznacz podejrzanych poniżej, aby ocenić wynik.", againBtn: "Zagraj ponownie", revealAllBtn: "Zatwierdź Głosy", hiddenRole: "???", imposterBadge: "Impostor", normalBadge: "Cywil", nextBtn: "Dalej", backBtn: "Wstecz", quitBtn: "Menu", nickScreenTitle: "Gracze", hintsLabel: "Podpowiedzi Impostora", winMsg: "🏆 Cywile Wygrali // Impostor Złapany", loseMsg: "💥 Impostor Wygrał // Infiltracja Udana", discTitle: "Runda Dyskusji", discDesc: "Wszystkie słowa przeczytane. Czas na rozmowę!", toVoteBtn: "Przejdź do głosowania", starterPrefix: "Zaczyna", overlayTitle: "Wybierz temat", randomTheme: "🎲 Losowy temat" },
+            de: { title: "Imposter", subtitleLbl: "Lokales Partyspiel", setupTitle: "Spiel-Setup", themeLabel: "Thema", totalPlayers: "Spieleranzahl", totalImposters: "Imposter", enterNicks: "Spielernamen eingeben:", defaultNick: "Spieler", startBtn: "Spiel starten", turn: "{name} ist dran", passMsg: "Gib das Telefon an diesen Spieler weiter und tippe unten, um dein Wort zu sehen.", revealBtn: "Wort anzeigen", secretLead: "Dein geheimes Wort:", imposterAlert: "⚠️ Du bist der Imposter!", hideBtn: "Verstanden, verbergen", endTitle: "Zeit zu voten!", endMsg: "Wer ist der Imposter? Markiere die Verdächtigen unten für die Auswertung.", againBtn: "Nochmal spielen", revealAllBtn: "Stimmen Bestätigen", hiddenRole: "???", imposterBadge: "Imposter", normalBadge: "Zivilist", nextBtn: "Weiter", backBtn: "Zurück", quitBtn: "Menü", nickScreenTitle: "Spieler", hintsLabel: "Hinweise für Imposter", winMsg: "🏆 Zivilisten Gewonnen // Imposter Entlarvt", loseMsg: "💥 Imposter Gewonnen // Infiltration Erfolgreich", discTitle: "Diskussionsrunde", discDesc: "Alle Wörter wurden gelesen. Zeit zu diskutieren!", toVoteBtn: "Zum Menü Abstimmen", starterPrefix: "Du beginnst", overlayTitle: "Thema wählen", randomTheme: "🎲 Zufälliges Thema" },
+            es: { title: "El Impostor", subtitleLbl: "Juego de mesa local", setupTitle: "Configuración", themeLabel: "Tema", totalPlayers: "Total Jugadores", totalImposters: "Impostores", enterNicks: "Introduce nombres:", defaultNick: "Jugador", startBtn: "Iniciar Juego", turn: "Turno de {name}", passMsg: "Pasa el teléfono a este jugador, luego toca abajo para ver tu palabra.", revealBtn: "Revelar Palabra", secretLead: "Tu palabra secreta:", imposterAlert: "⚠️ ¡Eres el Impostor!", hideBtn: "Entendido, ocultar", endTitle: "¡A votar!", endMsg: "¿Quién es el Impostor? Selecciona a los sospechosos abajo para comprobar.", againBtn: "Jugar de nuevo", revealAllBtn: "Confirmar Votos", hiddenRole: "???", imposterBadge: "Impostor", normalBadge: "Civil", nextBtn: "Siguiente", backBtn: "Atrás", quitBtn: "Menú", nickScreenTitle: "Jugadores", hintsLabel: "Pistas a Impostores", winMsg: "🏆 Civiles Ganaron // Impostor Atrapado", loseMsg: "💥 Impostor Ganó // Infiltración Exitosa", discTitle: "Ronda de Discusión", discDesc: "Se leyeron todos los secretos. ¡A debatir!", toVoteBtn: "Ir a Votación", starterPrefix: "Empieza", overlayTitle: "Elegir tema", randomTheme: "🎲 Tema aleatorio" },
+            fr: { title: "L'Imposteur", subtitleLbl: "Jeu de soirée local", setupTitle: "Configuration", themeLabel: "Thème", totalPlayers: "Total de Joueurs", totalImposters: "Imposteurs", enterNicks: "Entrez les prénoms :", defaultNick: "Joueur", startBtn: "Lancer le jeu", turn: "Tour de {name}", passMsg: "Passez le téléphone à ce joueur, puis appuyez ci-dessous pour voir le mot.", revealBtn: "Révéler le mot", secretLead: "Votre mot secret :", imposterAlert: "⚠️ Tu es l'Imposteur !", hideBtn: "Compris, cacher", endTitle: "Place au vote !", endMsg: "Qui est l'Imposteur ? Cochez les suspects ci-dessous pour le verdict.", againBtn: "Rejouer", revealAllBtn: "Valider le Vote", hiddenRole: "???", imposterBadge: "Imposteur", normalBadge: "Civil", nextBtn: "Suivant", backBtn: "Retour", quitBtn: "Menu", nickScreenTitle: "Joueurs", hintsLabel: "Indices Imposteurs", winMsg: "🏆 Civils Gagnez // Imposteur Capturé", loseMsg: "💥 Imposteur Gagné // Infiltration Réussie", discTitle: "Discussion Globale", discDesc: "Tous les mots sont lus. Place au débat !", toVoteBtn: "Passer au Vote", starterPrefix: "Tu commences", overlayTitle: "Choisir un thème", randomTheme: "🎲 Thème Aléatoire" },
+            it: { title: "L'Impostore", subtitleLbl: "Gioco da festa locale", setupTitle: "Preparazione", themeLabel: "Tema", totalPlayers: "Giocatori Totali", totalImposters: "Impostori", enterNicks: "Inserisci i nomi:", defaultNick: "Giocatore", startBtn: "Avvia Gioco", turn: "Turno di {name}", passMsg: "Passa il telefono a questo giocatore, poi tocca sotto per vedere la parola.", revealBtn: "Rivela Parola", secretLead: "La tua parola segreta:", imposterAlert: "⚠️ Sei l'Impostore!", hideBtn: "Capito, nascondi", endTitle: "Ora si vota!", endMsg: "Chi è l'Impostore? Seleziona i sospettati in basso per controllare.", againBtn: "Gioca ancora", revealAllBtn: "Conferma Voti", hiddenRole: "???", imposterBadge: "Impostore", normalBadge: "Civile", nextBtn: "Avanti", backBtn: "Indietro", quitBtn: "Menu", nickScreenTitle: "Giocatori", hintsLabel: "Indizi Impostori", winMsg: "🏆 Civili Vinto // Impostore Catturato", loseMsg: "💥 Impostore Vinto // Infiltrazione Riuscita", discTitle: "Fase di Discussione", discDesc: "Tutti i segreti sono stati svelati. Iniziate a parlare!", toVoteBtn: "Apri Votazione", starterPrefix: "Cominci tu", overlayTitle: "Scegli l'argomento", randomTheme: "🎲 Argomento Casuale" }
+        };
+
+        const localFallbackDatabase = {
+            "themes": {
+                "food_and_drinks": {
+                    "name": { "en": "Food and Drinks", "uk": "Їжа та напої", "pl": "Jedzenie i napoje" },
+                    "words": [
+                        { "id": 1, "word": { "en": "tea", "uk": "чай", "pl": "herbata", "de": "Tee", "es": "té", "fr": "thé", "it": "tè" }, "imposter_hint": { "en": "coffee", "uk": "кава", "pl": "kawa", "de": "Kaffee", "es": "café", "fr": "café", "it": "caffè" } },
+                        { "id": 2, "word": { "en": "pizza", "uk": "піца", "pl": "pizza", "de": "Pizza", "es": "pizza", "fr": "pizza", "it": "pizza" }, "imposter_hint": { "en": "food", "uk": "їжа", "pl": "jedzenie", "de": "Essen", "es": "comida", "fr": "nourriture", "it": "cibo" } }
+                    ]
+                }
+            }
+        };
+
+        let database = localFallbackDatabase;
+        const LIVE_JSON_URL = "https://raw.githubusercontent.com/katsu49/imposter-game-words/main/imposter_game_db.json";
+
+        let currentLang = 'en';
+        let gamePlayers = []; 
+        let currentPlayerIndex = 0;
+        let cachedSessionSettings = null;
+        let selectedThemeKey = 'random_mode';
+        
+        let globalSelectedPlayersCount = 4;
+        let globalSelectedImpostersCount = 1;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const cachedData = localStorage.getItem('imposter_words_db');
+            if (cachedData) {
+                try { database = JSON.parse(cachedData); } catch(e) { database = localFallbackDatabase; }
+            }
+            syncDatabaseWithCloud();
+        });
+
+        async function syncDatabaseWithCloud() {
+            try {
+                const response = await fetch(LIVE_JSON_URL);
+                if (response.ok) {
+                    const freshData = await response.json();
+                    if (freshData && freshData.themes) {
+                        database = freshData;
+                        localStorage.setItem('imposter_words_db', JSON.stringify(freshData));
+                        if (!document.getElementById('setup-screen').classList.contains('hidden')) {
+                            refreshThemeTriggerLabel();
+                        }
+                    }
+                }
+            } catch(err) { console.log("Operating on offline client cache."); }
+        }
+
+        function refreshThemeTriggerLabel() {
+            const trigger = document.getElementById('theme-selector-trigger');
+            if (selectedThemeKey === 'random_mode') {
+                trigger.innerText = translations[currentLang].randomTheme;
+                return;
+            }
+            const themeData = database.themes[selectedThemeKey];
+            if (themeData) {
+                trigger.innerText = themeData.name ? (themeData.name[currentLang] || themeData.name['en'] || selectedThemeKey) : selectedThemeKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            } else {
+                selectedThemeKey = 'random_mode';
+                trigger.innerText = translations[currentLang].randomTheme;
+            }
+        }
+
+        function openThemeOverlay() {
+            const container = document.getElementById('theme-options-container');
+            container.innerHTML = '';
+            
+            const randomBtn = document.createElement('button');
+            randomBtn.className = 'theme-option-btn random-spec';
+            if (selectedThemeKey === 'random_mode') randomBtn.classList.add('selected');
+            randomBtn.innerText = translations[currentLang].randomTheme;
+            randomBtn.onclick = () => { selectedThemeKey = 'random_mode'; refreshThemeTriggerLabel(); closeOverlay('theme-overlay'); };
+            container.appendChild(randomBtn);
+
+            Object.keys(database.themes).forEach(themeKey => {
+                const themeData = database.themes[themeKey];
+                const btn = document.createElement('button');
+                btn.className = 'theme-option-btn';
+                if (themeKey === selectedThemeKey) btn.classList.add('selected');
+                btn.innerText = themeData.name ? (themeData.name[currentLang] || themeData.name['en'] || themeKey) : themeKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                btn.onclick = () => { selectedThemeKey = themeKey; refreshThemeTriggerLabel(); closeOverlay('theme-overlay'); };
+                container.appendChild(btn);
+            });
+            showOverlay('theme-overlay');
+        }
+
+        function openPlayersOverlay() {
+            const container = document.getElementById('players-options-container');
+            container.innerHTML = '';
+            
+            for (let i = 3; i <= 15; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'theme-option-btn';
+                if (i === globalSelectedPlayersCount) btn.classList.add('selected');
+                btn.innerText = i;
+                btn.onclick = () => {
+                    globalSelectedPlayersCount = i;
+                    document.getElementById('players-selector-trigger').innerText = i;
+                    closeOverlay('players-overlay');
+                    autoValidateImposterCapFloor();
+                };
+                container.appendChild(btn);
+            }
+            showOverlay('players-overlay');
+        }
+
+        function openImpostersOverlay() {
+            const container = document.getElementById('imposters-options-container');
+            container.innerHTML = '';
+            
+            const maximumAllowed = Math.floor(globalSelectedPlayersCount / 2.5);
+            
+            for (let i = 1; i <= maximumAllowed; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'theme-option-btn';
+                if (i === globalSelectedImpostersCount) btn.classList.add('selected');
+                btn.innerText = i;
+                btn.onclick = () => {
+                    globalSelectedImpostersCount = i;
+                    document.getElementById('imposters-selector-trigger').innerText = i;
+                    closeOverlay('imposters-overlay');
+                };
+                container.appendChild(btn);
+            }
+            showOverlay('imposters-overlay');
+        }
+
+        function autoValidateImposterCapFloor() {
+            const maxLimit = Math.floor(globalSelectedPlayersCount / 2.5);
+            if (globalSelectedImpostersCount > maxLimit) {
+                globalSelectedImpostersCount = maxLimit < 1 ? 1 : maxLimit;
+            }
+            document.getElementById('imposters-selector-trigger').innerText = globalSelectedImpostersCount;
+        }
+
+        function showOverlay(id) {
+            const element = document.getElementById(id);
+            element.classList.remove('hidden');
+            element.style.opacity = 0;
+            setTimeout(() => { element.style.opacity = 1; }, 20);
+        }
+
+        function closeOverlay(id) {
+            const element = document.getElementById(id);
+            element.style.opacity = 0;
+            setTimeout(() => { element.classList.add('hidden'); }, 200);
+        }
+
+        function switchScreen(fromId, toId) {
+            const fromScreen = document.getElementById(fromId);
+            const toScreen = document.getElementById(toId);
+            fromScreen.style.opacity = 0;
+            setTimeout(() => {
+                fromScreen.classList.add('hidden');
+                toScreen.classList.remove('hidden');
+                toScreen.style.opacity = 0;
+                setTimeout(() => { toScreen.style.opacity = 1; }, 20);
+            }, 180);
+        }
+
+        function selectLanguage(langCode) {
+            currentLang = langCode;
+            Object.keys(translations[langCode]).forEach(key => {
+                const element = document.getElementById(`ui-${key.replace(/([A-Z])/g, "-$1").toLowerCase()}`);
+                if (element) element.innerText = translations[langCode][key];
+            });
+            
+            document.getElementById('ui-overlay-players-title').innerText = translations[langCode].totalPlayers;
+            document.getElementById('ui-overlay-imposters-title').innerText = translations[langCode].totalImposters;
+
+            document.getElementById('players-selector-trigger').innerText = globalSelectedPlayersCount;
+            document.getElementById('imposters-selector-trigger').innerText = globalSelectedImpostersCount;
+
+            refreshThemeTriggerLabel();
+            switchScreen('lang-screen', 'setup-screen');
+        }
+
+        function showNicknamesScreen() {
+            const container = document.getElementById('nickname-inputs-container');
+            const savedNames = Array.from(container.querySelectorAll('input')).map(input => input.value);
+            container.innerHTML = '';
+
+            for (let i = 0; i < globalSelectedPlayersCount; i++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'player-nickname';
+                input.placeholder = `${translations[currentLang].defaultNick} ${i + 1}`;
+                input.value = savedNames[i] || '';
+                container.appendChild(input);
+            }
+
+            switchScreen('setup-screen', 'nicknames-screen');
+        }
+
+        function backToSetup() {
+            switchScreen('nicknames-screen', 'setup-screen');
+        }
+
+        function backToLang() {
+            switchScreen('setup-screen', 'lang-screen');
+        }
+
+        function startGame() {
+            const nicknameInputs = document.querySelectorAll('.player-nickname');
+            const hintsEnabled = document.getElementById('hints-enabled').checked;
+
+            let names = [];
+            for (let i = 0; i < globalSelectedPlayersCount; i++) {
+                let name = nicknameInputs[i]?.value.trim();
+                if (!name) name = `${translations[currentLang].defaultNick} ${i + 1}`;
+                names.push(name);
+            }
+
+            cachedSessionSettings = {
+                totalPlayers: globalSelectedPlayersCount,
+                totalImposters: globalSelectedImpostersCount,
+                selectedTheme: selectedThemeKey,
+                hintsEnabled: hintsEnabled,
+                names: names
+            };
+
+            runGameEngine(cachedSessionSettings);
+        }
+
+        function runGameEngine(sessionData) {
+            let activeRuntimeKey = sessionData.selectedTheme;
+            if (activeRuntimeKey === 'random_mode') {
+                const keys = Object.keys(database.themes);
+                activeRuntimeKey = keys[Math.floor(Math.random() * keys.length)];
+            }
+
+            const themeData = database.themes[activeRuntimeKey];
+            const wordList = Array.isArray(themeData) ? themeData : themeData.words;
+            
+            if (!wordList || wordList.length === 0) {
+                alert("No words found in this theme.");
+                return;
+            }
+            
+            const chosenEntry = wordList[Math.floor(Math.random() * wordList.length)];
+            const normalWord = chosenEntry.word[currentLang] || chosenEntry.word['en'];
+            
+            let imposterWord;
+            if (sessionData.hintsEnabled) {
+                imposterWord = (chosenEntry.imposter_hint && chosenEntry.imposter_hint[currentLang]) ? chosenEntry.imposter_hint[currentLang] : (chosenEntry.imposter_hint ? chosenEntry.imposter_hint['en'] : "Hint!");
+            } else {
+                imposterWord = translations[currentLang].hiddenRole; 
+            }
+
+            let roles = [];
+            for (let i = 0; i < sessionData.totalImposters; i++) roles.push({ isImposter: true, text: imposterWord });
+            for (let i = sessionData.totalImposters; i < sessionData.totalPlayers; i++) roles.push({ isImposter: false, text: normalWord });
+            roles.sort(() => Math.random() - 0.5);
+
+            gamePlayers = [];
+            for (let i = 0; i < sessionData.totalPlayers; i++) {
+                gamePlayers.push({ name: sessionData.names[i], role: roles[i] });
+            }
+
+            currentPlayerIndex = 0;
+            
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('nicknames-screen').classList.add('hidden');
+            document.getElementById('game-result-banner').classList.add('hidden');
+            
+            const gameScreen = document.getElementById('game-screen');
+            gameScreen.classList.remove('hidden');
+            gameScreen.style.opacity = 1;
+            
+            updateTurnScreen();
+        }
+
+        function updateTurnScreen() {
+            const activePlayer = gamePlayers[currentPlayerIndex];
+            document.getElementById('player-turn').innerText = translations[currentLang].turn.replace('{name}', activePlayer.name);
+            document.getElementById('ui-reveal-btn').classList.remove('hidden');
+            document.getElementById('secret-area').classList.add('hidden');
+        }
+
+        function revealWord() {
+            const currentPlayer = gamePlayers[currentPlayerIndex];
+            const alertElement = document.getElementById('ui-imposter-alert');
+            document.getElementById('secret-word').innerText = currentPlayer.role.text;
+            
+            if (currentPlayer.role.isImposter) {
+                alertElement.innerText = translations[currentLang].imposterAlert;
+                alertElement.classList.remove('hidden');
+            } else {
+                alertElement.classList.add('hidden');
+            }
+            document.getElementById('ui-reveal-btn').classList.add('hidden');
+            document.getElementById('secret-area').classList.remove('hidden');
+        }
+
+        function nextPlayer() {
+            currentPlayerIndex++;
+            if (currentPlayerIndex < gamePlayers.length) {
+                updateTurnScreen();
+            } else {
+                selectAndShowRandomDiscussionStarter();
+            }
+        }
+
+        function selectAndShowRandomDiscussionStarter() {
+            const randomStarter = gamePlayers[Math.floor(Math.random() * gamePlayers.length)];
+            document.getElementById('ui-starter-prefix').innerText = translations[currentLang].starterPrefix;
+            document.getElementById('discussion-starter-name').innerText = randomStarter.name;
+            switchScreen('game-screen', 'discussion-screen');
+        }
+
+        function loadVotingMenu() {
+            buildInitialSummary();
+            switchScreen('discussion-screen', 'end-screen');
+        }
+
+        function buildInitialSummary() {
+            const summaryDiv = document.getElementById('game-summary');
+            summaryDiv.innerHTML = '';
+            document.getElementById('ui-reveal-all-btn').classList.remove('hidden');
+            
+            gamePlayers.forEach((player, idx) => {
+                const item = document.createElement('div');
+                item.className = 'summary-item';
+                item.innerHTML = `
+                    <span><strong>${player.name}</strong></span>
+                    <div id="action-holder-${idx}">
+                        <input type="checkbox" id="vote-check-${idx}" class="vote-check-input" onchange="enforceVotingCap()">
+                        <label for="vote-check-${idx}" class="vote-label"></label>
+                    </div>`;
+                summaryDiv.appendChild(item);
+            });
+            enforceVotingCap();
+        }
+
+        function enforceVotingCap() {
+            const activeImposterTarget = cachedSessionSettings ? cachedSessionSettings.totalImposters : 1;
+            const checkedInputs = document.querySelectorAll('.vote-check-input:checked');
+            const allInputs = document.querySelectorAll('.vote-check-input');
+
+            if (checkedInputs.length >= activeImposterTarget) {
+                allInputs.forEach(input => {
+                    if (!input.checked) input.disabled = true;
+                });
+            } else {
+                allInputs.forEach(input => input.disabled = false);
+            }
+        }
+
+        function evaluateVotesAndReveal() {
+            let correctlyGuessedAll = true;
+            let civilianAccused = false;
+
+            gamePlayers.forEach((player, idx) => {
+                const isChecked = document.getElementById(`vote-check-${idx}`).checked;
+                if (player.role.isImposter && !isChecked) correctlyGuessedAll = false; 
+                if (!player.role.isImposter && isChecked) civilianAccused = true; 
+            });
+
+            const banner = document.getElementById('game-result-banner');
+            banner.classList.remove('hidden');
+
+            if (correctlyGuessedAll && !civilianAccused) {
+                banner.innerText = translations[currentLang].winMsg;
+                banner.className = "result-banner win";
+            } else {
+                banner.innerText = translations[currentLang].loseMsg;
+                banner.className = "result-banner lose";
+            }
+
+            gamePlayers.forEach((player, idx) => {
+                const holder = document.getElementById(`action-holder-${idx}`);
+                const badge = document.createElement('span');
+                badge.innerText = `${player.role.text}`;
+                badge.className = player.role.isImposter ? 'role-badge imposter-role' : 'role-badge normal-role';
+                holder.innerHTML = '';
+                holder.appendChild(badge);
+            });
+
+            document.getElementById('ui-reveal-all-btn').classList.add('hidden');
+        }
+
+        function playAgainSameSettings() {
+            if (cachedSessionSettings) {
+                document.getElementById('end-screen').classList.add('hidden');
+                runGameEngine(cachedSessionSettings);
+                syncDatabaseWithCloud();
+            } else {
+                quitToMainMenu();
+            }
+        }
+
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        };
+
+        function quitToMainMenu() {
+            cachedSessionSettings = null; 
+            switchScreen('end-screen', 'lang-screen');
+            syncDatabaseWithCloud();
+        }
+    </script>
+</body>
+</html>
